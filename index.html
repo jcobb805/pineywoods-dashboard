@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pineywoods Ranch Partners - Note Portfolio Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f1117; color: #e2e8f0; }
+
+  .header {
+    background: #181b24;
+    border-bottom: 1px solid #2a2e3a;
+    padding: 14px 28px 0;
+    display: flex; align-items: flex-end; justify-content: space-between;
+  }
+  .header-left h1 { font-size: 22px; font-weight: 700; color: #f1f5f9; letter-spacing: 0.5px; }
+  .header-left p { font-size: 12px; color: #64748b; margin-top: 2px; padding-bottom: 10px; }
+
+  .tab-bar { display: flex; gap: 0; }
+  .tab-btn {
+    background: none; border: none; color: #64748b; font-size: 13px; font-weight: 600;
+    padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tab-btn:hover { color: #e2e8f0; }
+  .tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+
+  .page { display: none; }
+  .page.active { display: block; overflow-y: auto; height: calc(100vh - 56px); padding: 20px 28px; }
+
+  /* KPI Cards */
+  .analytics-kpis {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: #181b24; border: 1px solid #2a2e3a; border-radius: 10px;
+    padding: 14px 16px; position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent, #60a5fa);
+  }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-top: 4px; }
+  .kpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .kpi-sub .up { color: #22c55e; }
+  .kpi-sub .down { color: #ef4444; }
+
+  /* Chart Grid */
+  .section-title {
+    font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 24px 0 12px;
+    padding-bottom: 8px; border-bottom: 1px solid #2a2e3a;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card {
+    background: #181b24; border: 1px solid #2a2e3a; border-radius: 10px; padding: 18px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-card h4 { font-size: 14px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+  .chart-card .chart-sub { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+  .chart-card canvas { width: 100% !important; }
+
+  /* Range buttons */
+  .range-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .range-bar span { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .range-btn {
+    background: #181b24; border: 1px solid #2a2e3a; border-radius: 6px; padding: 5px 14px;
+    font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.15s;
+  }
+  .range-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+  .range-btn.active { background: #60a5fa; color: #fff; border-color: #60a5fa; }
+
+  /* Balance Sheet & Income Statement tables */
+  .fin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fin-table th { text-align: right; padding: 8px 12px; color: #94a3b8; font-weight: 600; border-bottom: 2px solid #2a2e3a; }
+  .fin-table th:first-child { text-align: left; }
+  .fin-table td { padding: 6px 12px; border-bottom: 1px solid #1e2130; }
+  .fin-table td:first-child { color: #94a3b8; }
+  .fin-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .fin-table .section-header td { color: #60a5fa; font-weight: 700; padding-top: 14px; border-bottom: none; }
+  .fin-table .total-row td { font-weight: 700; color: #f1f5f9; border-top: 2px solid #2a2e3a; }
+  .fin-table .indent td:first-child { padding-left: 24px; }
+  .fin-table .variance-pos { color: #22c55e; }
+  .fin-table .variance-neg { color: #ef4444; }
+
+  /* Partners table */
+  .partner-card {
+    background: #181b24; border: 1px solid #2a2e3a; border-radius: 10px; padding: 18px; margin-bottom: 16px;
+  }
+  .partner-card h4 { font-size: 14px; font-weight: 700; color: #f1f5f9; margin-bottom: 12px; }
+
+  /* Delinquency table */
+  .delinq-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .delinq-table th { padding: 8px 10px; text-align: left; color: #94a3b8; font-weight: 600; border-bottom: 2px solid #2a2e3a; }
+  .delinq-table td { padding: 8px 10px; border-bottom: 1px solid #1e2130; color: #e2e8f0; }
+  .delinq-table tr:hover { background: #1e2130; }
+  .delinq-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .badge-critical { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .badge-warning { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .badge-info { background: rgba(96,165,250,0.15); color: #60a5fa; }
+
+  @media (max-width: 900px) {
+    .analytics-kpis { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid { grid-template-columns: 1fr; }
+    .chart-card.full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Pineywoods Ranch Partners, LLC</h1>
+    <p>Note Portfolio Dashboard &bull; As of May 31, 2025</p>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="window.switchTab('metrics')">Note Portfolio Metrics</button>
+    <button class="tab-btn" onclick="window.switchTab('financials')">Financial Statements</button>
+    <button class="tab-btn" onclick="window.switchTab('partners')">Partners Capital</button>
+    <button class="tab-btn" onclick="window.switchTab('delinquency')">Delinquency Detail</button>
+  </div>
+</div>
+
+<!-- ========== TAB 1: METRICS ========== -->
+<div class="page active" id="page-metrics">
+  <div class="range-bar">
+    <span>Time Range:</span>
+    <button class="range-btn active" onclick="window.setRange('all')">All Time</button>
+    <button class="range-btn" onclick="window.setRange(6)">6 Months</button>
+    <button class="range-btn" onclick="window.setRange(12)">12 Months</button>
+    <button class="range-btn" onclick="window.setRange(24)">24 Months</button>
+  </div>
+  <div class="analytics-kpis">
+    <div class="kpi-card" style="--accent:#60a5fa;"><div class="kpi-label">Notes Held</div><div class="kpi-value" id="kpi-notes"></div><div class="kpi-sub" id="kpi-notes-d"></div></div>
+    <div class="kpi-card" style="--accent:#22c55e;"><div class="kpi-label">Note Balance</div><div class="kpi-value" id="kpi-bal"></div><div class="kpi-sub" id="kpi-bal-d"></div></div>
+    <div class="kpi-card" style="--accent:#f59e0b;"><div class="kpi-label">Monthly Collections</div><div class="kpi-value" id="kpi-coll"></div><div class="kpi-sub" id="kpi-coll-d"></div></div>
+    <div class="kpi-card" style="--accent:#a855f7;"><div class="kpi-label">Delinquency Rate</div><div class="kpi-value" id="kpi-delinq"></div><div class="kpi-sub" id="kpi-delinq-d"></div></div>
+    <div class="kpi-card" style="--accent:#ec4899;"><div class="kpi-label">Gross Profit %</div><div class="kpi-value" id="kpi-gp"></div><div class="kpi-sub" id="kpi-gp-d"></div></div>
+    <div class="kpi-card" style="--accent:#06b6d4;"><div class="kpi-label">Lots Sold (Latest)</div><div class="kpi-value" id="kpi-lots"></div><div class="kpi-sub" id="kpi-lots-d"></div></div>
+  </div>
+
+  <div class="section-title">Portfolio Growth</div>
+  <div class="chart-grid">
+    <div class="chart-card full"><h4>Note Portfolio Balance & Deferred Revenue</h4><div class="chart-sub">Total note receivable vs. deferred revenue over time</div><canvas id="chart-portfolio" height="160"></canvas></div>
+    <div class="chart-card"><h4>Notes Held (Count)</h4><div class="chart-sub">Active note count growth trajectory</div><canvas id="chart-notes" height="160"></canvas></div>
+    <div class="chart-card"><h4>Net Equity in Notes</h4><div class="chart-sub">Note balance minus deferred revenue</div><canvas id="chart-equity" height="160"></canvas></div>
+  </div>
+
+  <div class="section-title">Cash Flow & Collections</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Monthly Note Payments</h4><div class="chart-sub">Total cash collected from note holders each month</div><canvas id="chart-payments" height="160"></canvas></div>
+    <div class="chart-card"><h4>Average Payment per Note</h4><div class="chart-sub">Monthly payments / notes held</div><canvas id="chart-avgpmt" height="160"></canvas></div>
+  </div>
+
+  <div class="section-title">Credit Quality</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Delinquency Rate</h4><div class="chart-sub">Percentage of notes 30+ days past due</div><canvas id="chart-delinqrate" height="160"></canvas></div>
+    <div class="chart-card"><h4>Delinquency Balance vs. Count</h4><div class="chart-sub">Dollar exposure and count of delinquent notes</div><canvas id="chart-delinqbal" height="160"></canvas></div>
+  </div>
+
+  <div class="section-title">Sales Activity & Margins</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Monthly Lot Sales</h4><div class="chart-sub">Owner-financed vs. cash sales breakdown</div><canvas id="chart-sales" height="160"></canvas></div>
+    <div class="chart-card"><h4>Gross Profit Margin</h4><div class="chart-sub">Portfolio-level GP% trend</div><canvas id="chart-gp" height="160"></canvas></div>
+  </div>
+</div>
+
+<!-- ========== TAB 2: FINANCIAL STATEMENTS ========== -->
+<div class="page" id="page-financials">
+  <div class="section-title" style="margin-top:0;">Comparative Balance Sheet - Income Tax Basis</div>
+  <div class="chart-card" style="overflow-x:auto;">
+    <table class="fin-table">
+      <thead><tr><th>Assets</th><th>5/31/2025</th><th>4/30/2025</th><th>Variance</th></tr></thead>
+      <tbody>
+        <tr class="section-header"><td colspan="4">Current Assets</td></tr>
+        <tr class="indent"><td>Cash and cash equivalents</td><td>$475,936</td><td>$349,020</td><td class="variance-pos">$126,916</td></tr>
+        <tr class="indent"><td>Accounts receivable</td><td>$7,939</td><td>$450</td><td class="variance-pos">$7,489</td></tr>
+        <tr class="total-row"><td>Total current assets</td><td>$483,875</td><td>$349,470</td><td class="variance-pos">$134,405</td></tr>
+
+        <tr class="section-header"><td colspan="4">Inventory</td></tr>
+        <tr class="indent"><td>Land and improvements</td><td>$2,838,389</td><td>$2,908,281</td><td class="variance-neg">($69,892)</td></tr>
+
+        <tr class="section-header"><td colspan="4">Fixed Assets</td></tr>
+        <tr class="indent"><td>Mobile homes</td><td>$190,697</td><td>$190,697</td><td>-</td></tr>
+        <tr class="indent"><td>Furniture and fixtures</td><td>$2,470</td><td>$2,470</td><td>-</td></tr>
+        <tr class="indent"><td>Computers and equipment</td><td>$5,933</td><td>$5,933</td><td>-</td></tr>
+        <tr class="indent"><td>Accumulated depreciation</td><td>($164,970)</td><td>($164,970)</td><td>-</td></tr>
+        <tr class="total-row"><td>Total fixed assets</td><td>$34,130</td><td>$34,130</td><td>-</td></tr>
+
+        <tr class="section-header"><td colspan="4">Other Assets</td></tr>
+        <tr class="indent"><td>Notes receivable</td><td>$28,453,018</td><td>$28,776,941</td><td class="variance-neg">($323,923)</td></tr>
+        <tr class="indent"><td>Investment in Sour Lake Ranches, LLC</td><td>$5,104,611</td><td>$4,904,907</td><td class="variance-pos">$199,704</td></tr>
+        <tr class="indent"><td>Loan fees</td><td>$152,000</td><td>$152,000</td><td>-</td></tr>
+        <tr class="total-row"><td>Total other assets</td><td>$33,709,629</td><td>$33,833,848</td><td class="variance-neg">($124,219)</td></tr>
+        <tr class="total-row" style="border-top:3px double #2a2e3a;"><td>Total Assets</td><td>$37,066,023</td><td>$37,125,729</td><td class="variance-neg">($59,706)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="chart-card" style="overflow-x:auto; margin-top:16px;">
+    <table class="fin-table">
+      <thead><tr><th>Liabilities & Partners' Capital</th><th>5/31/2025</th><th>4/30/2025</th><th>Variance</th></tr></thead>
+      <tbody>
+        <tr class="section-header"><td colspan="4">Liabilities</td></tr>
+        <tr class="indent"><td>Notes payable - Vista Bank</td><td>$14,434,105</td><td>$14,600,082</td><td class="variance-pos">($165,977)</td></tr>
+        <tr class="indent"><td>Due to related party</td><td>-</td><td>($1,097)</td><td>$1,097</td></tr>
+        <tr class="indent"><td>Deferred revenue</td><td>$14,412,072</td><td>$14,606,036</td><td class="variance-pos">($193,964)</td></tr>
+        <tr class="total-row"><td>Total liabilities</td><td>$28,846,177</td><td>$29,205,021</td><td class="variance-pos">($358,844)</td></tr>
+        <tr class="total-row"><td>Partners' capital</td><td>$8,219,846</td><td>$7,920,708</td><td class="variance-pos">$299,138</td></tr>
+        <tr class="total-row" style="border-top:3px double #2a2e3a;"><td>Total Liabilities & Partners' Capital</td><td>$37,066,023</td><td>$37,125,729</td><td class="variance-neg">($59,706)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Comparative Statement of Income - Income Tax Basis (YTD)</div>
+  <div class="chart-card" style="overflow-x:auto;">
+    <table class="fin-table">
+      <thead><tr><th></th><th>5/31/2025 YTD</th><th>4/30/2025 YTD</th><th>Variance</th></tr></thead>
+      <tbody>
+        <tr class="section-header"><td colspan="4">Income</td></tr>
+        <tr class="indent"><td>Sales</td><td>$470,650</td><td>$406,000</td><td class="variance-pos">$64,650</td></tr>
+        <tr class="indent"><td>Interest income</td><td>$1,127,995</td><td>$903,896</td><td class="variance-pos">$224,099</td></tr>
+        <tr class="indent"><td>Loan origination fees</td><td>$36,091</td><td>$32,206</td><td class="variance-pos">$3,885</td></tr>
+        <tr class="indent"><td>Fee income</td><td>$16,473</td><td>$12,670</td><td class="variance-pos">$3,803</td></tr>
+        <tr class="indent"><td>Management fee income</td><td>$237,348</td><td>$188,104</td><td class="variance-pos">$49,244</td></tr>
+        <tr class="total-row"><td>Total income</td><td>$1,888,557</td><td>$1,542,876</td><td class="variance-pos">$345,681</td></tr>
+        <tr><td>Cost of goods sold</td><td>$260,653</td><td>$211,597</td><td class="variance-neg">$49,056</td></tr>
+
+        <tr class="section-header"><td colspan="4">Expenses</td></tr>
+        <tr class="indent"><td>Advertising</td><td>$39,344</td><td>$34,620</td><td>$4,724</td></tr>
+        <tr class="indent"><td>Interest expense</td><td>$499,276</td><td>$402,008</td><td>$97,268</td></tr>
+        <tr class="indent"><td>Loan servicing fee</td><td>$59,946</td><td>$47,956</td><td>$11,990</td></tr>
+        <tr class="indent"><td>Management fee</td><td>$109,015</td><td>$101,817</td><td>$7,198</td></tr>
+        <tr class="indent"><td>Professional fees</td><td>$53,437</td><td>$50,172</td><td>$3,265</td></tr>
+        <tr class="indent"><td>Salaries and wages</td><td>$263,447</td><td>$219,732</td><td>$43,715</td></tr>
+        <tr class="indent"><td>All other expenses</td><td>$86,489</td><td>$90,551</td><td class="variance-pos">($4,062)</td></tr>
+        <tr class="total-row"><td>Total expenses</td><td>$1,110,954</td><td>$946,856</td><td class="variance-neg">$164,098</td></tr>
+
+        <tr class="section-header"><td colspan="4">Other Income</td></tr>
+        <tr class="indent"><td>Installment sale</td><td>$778,045</td><td>$622,720</td><td class="variance-pos">$155,325</td></tr>
+        <tr class="indent"><td>Other income</td><td>$41,133</td><td>$29,847</td><td class="variance-pos">$11,286</td></tr>
+        <tr class="total-row"><td>Total other income</td><td>$819,178</td><td>$652,567</td><td class="variance-pos">$166,611</td></tr>
+        <tr class="total-row" style="border-top:3px double #2a2e3a;"><td>Net Income</td><td>$1,336,128</td><td>$1,036,990</td><td class="variance-pos">$299,138</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Asset Composition</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Asset Breakdown</h4><div class="chart-sub">Current period allocation</div><canvas id="chart-assets" height="200"></canvas></div>
+    <div class="chart-card"><h4>Income Sources (YTD)</h4><div class="chart-sub">Revenue mix through May 2025</div><canvas id="chart-income" height="200"></canvas></div>
+  </div>
+  <div class="chart-grid" style="margin-top:16px;">
+    <div class="chart-card"><h4>Expense Breakdown (YTD)</h4><div class="chart-sub">Top expenses by category</div><canvas id="chart-expenses" height="200"></canvas></div>
+    <div class="chart-card"><h4>Leverage & Equity</h4><div class="chart-sub">Capital structure</div><canvas id="chart-leverage" height="200"></canvas></div>
+  </div>
+</div>
+
+<!-- ========== TAB 3: PARTNERS CAPITAL ========== -->
+<div class="page" id="page-partners">
+  <div class="section-title" style="margin-top:0;">Statement of Changes in Partners' Capital</div>
+  <div class="chart-card" style="overflow-x:auto;">
+    <table class="fin-table">
+      <thead><tr><th>Partner</th><th>12/31/24 Bal</th><th>Contributions</th><th>Net Income (Jan-Apr)</th><th>4/30/25 Bal</th><th>Net Income (May)</th><th>5/31/25 Bal</th></tr></thead>
+      <tbody>
+        <tr><td>BLC Preston Family Partnership, LLC</td><td>$979,351</td><td>$167,936</td><td>$172,832</td><td>$1,320,119</td><td>$49,856</td><td>$1,369,975</td></tr>
+        <tr><td>KCH Hart Family Partnership, LLC</td><td>$979,351</td><td>$167,936</td><td>$172,831</td><td>$1,320,118</td><td>$49,856</td><td>$1,369,974</td></tr>
+        <tr><td>Kulbeth Family Partnership, LLC</td><td>$979,351</td><td>$167,936</td><td>$172,831</td><td>$1,320,118</td><td>$49,856</td><td>$1,369,974</td></tr>
+        <tr><td>Pigg Brothers, LLC</td><td>$979,350</td><td>$167,936</td><td>$172,832</td><td>$1,320,118</td><td>$49,856</td><td>$1,369,974</td></tr>
+        <tr><td>WCA Family Partnership, LLC</td><td>$979,350</td><td>$167,935</td><td>$172,832</td><td>$1,320,117</td><td>$49,857</td><td>$1,369,974</td></tr>
+        <tr><td>LBGI, Inc.</td><td>$979,350</td><td>$167,936</td><td>$172,832</td><td>$1,320,118</td><td>$49,857</td><td>$1,369,975</td></tr>
+        <tr class="total-row"><td>Total</td><td>$5,876,103</td><td>$1,007,615</td><td>$1,036,990</td><td>$7,920,708</td><td>$299,138</td><td>$8,219,846</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Partner Equity Distribution</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Current Capital Balance by Partner</h4><div class="chart-sub">As of May 31, 2025</div><canvas id="chart-partner-bal" height="200"></canvas></div>
+    <div class="chart-card"><h4>Capital Movement (2025 YTD)</h4><div class="chart-sub">Beginning balance, contributions, and net income</div><canvas id="chart-partner-waterfall" height="200"></canvas></div>
+  </div>
+</div>
+
+<!-- ========== TAB 4: DELINQUENCY ========== -->
+<div class="page" id="page-delinquency">
+  <div class="section-title" style="margin-top:0;">Delinquent Notes Detail</div>
+  <div class="analytics-kpis" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+    <div class="kpi-card" style="--accent:#ef4444;"><div class="kpi-label">Delinquent Notes</div><div class="kpi-value">1</div><div class="kpi-sub">of 220 total notes</div></div>
+    <div class="kpi-card" style="--accent:#f59e0b;"><div class="kpi-label">Delinquency Rate</div><div class="kpi-value">5.00%</div><div class="kpi-sub">by count</div></div>
+    <div class="kpi-card" style="--accent:#a855f7;"><div class="kpi-label">Delinquent Balance</div><div class="kpi-value">$2.40MM</div><div class="kpi-sub">total exposure</div></div>
+    <div class="kpi-card" style="--accent:#60a5fa;"><div class="kpi-label">Foreclosure Scheduled</div><div class="kpi-value">4</div><div class="kpi-sub">scheduled for 7/1/2025</div></div>
+  </div>
+
+  <div class="chart-card">
+    <table class="delinq-table">
+      <thead><tr><th>#</th><th>Borrower / Property</th><th>Days Past Due</th><th>Status</th><th>Payment History</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td style="font-weight:600;">- Cash</td><td><span class="delinq-badge badge-info">0 days</span></td><td>1</td><td>[object Object]</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+var Q = String.fromCharCode(39);
+var CD = {"labels":["Jul '22","Aug '22","Sep '22","Oct '22","Nov '22","Dec '22","Jan '23","Feb '23","Mar '23","Apr '23","May '23","Jun '23","Jul '23","Aug '23","Sep '23","Oct '23","Nov '23","Dec '23","Jan '24","Feb '24","Mar '24","Apr '24","May '24","Jun '24","Jul '24","Aug '24","Sep '24","Oct '24","Nov '24","Dec '24","Jan '25","Feb '25","Mar '25","Apr '25","May '25"],"notesHeld":[3,3,5,5,6,6,6,6,6,8,12,17,17,24,38,50,64,79,92,108,119,131,140,150,162,175,190,200,211,218,221,217,222,221,220],"noteBalance":[559720.69,559508.23,722108.31,720484.22,776550.66,773876.36,772343.59,771109.85,768583.65,1345225.4,2019488.19,2517384,2384355.26,2986781.27,5075636.1,6438268.2,8432877.04,10717904.67,13221870.03,15346233.58,16405901.85,17383096.5,18489457.13,19351405.28,21275774.06,22433878.59,24055493.2,26003266.16,27177542.68,28449401.42,29148192.22,28580687.76,28915234.58,28776941.36,28453017.98],"deferredRev":[320930.26,320771.52,414938.49,413926.61,462709.06,449823.49,448849.3,448052.97,446509.31,772764.66,1167873.62,1433733,868236,1250311.84,1728947.13,2260698.49,3457522.94,4884070.34,5128613.91,6536888.71,7313028.37,7925185.82,8661553.55,9301135.98,10452195.72,11188770.32,12287206.91,13326459.36,13912042.12,14523836.31,14893893.34,14548415.57,14712806.61,14606036.52,14412072.01],"basisInNotes":[238790.42999999993,238736.70999999996,307169.82000000007,306557.61,313841.60000000003,324052.87,323494.29,323056.88,322074.34,572460.7399999999,851614.5699999998,1083651,1516119.2599999998,1736469.43,3346688.9699999997,4177569.71,4975354.1,5833834.33,8093256.119999999,8809344.870000001,9092873.48,9457910.68,9827903.579999998,10050269.3,10823578.339999998,11245108.27,11768286.29,12676806.8,13265500.56,13925565.110000001,14254298.879999999,14032272.190000001,14202427.969999999,14170904.84,14040945.97],"gpPct":[0.5733757313848806,0.5733097438084155,0.574620848775442,0.5745116943713215,0.5958517374771145,0.5812601511693677,0.581152359923127,0.5810494704483414,0.5809508307911572,0.5744499471984398,0.5783017824927217,0.5695328960539989,0.3641386896346982,0.4186151334744375,0.3406365420877986,0.3511345628627276,0.41000514102124275,0.45569264612613875,0.38788869489439387,0.42596045967391044,0.44575595031979304,0.45591335352708884,0.46845905150704664,0.480643955589772,0.4912721713684151,0.4987443555563969,0.5107859068963093,0.5124917492287823,0.5118947759113591,0.5105146535627884,0.5109714258636106,0.5090295829186162,0.5088254279692584,0.5075604226758587,0.5065217341840657],"monthlyPayments":[4137.75,4137.75,6537.75,6537.75,6933.14,6933.14,6933.14,6933.14,6933.14,11935.01,18554.79,23409.89,22169.52,28349.19,47595.1,61369.5,77874.32,96563.93,121332.36,142414.56,153805.7,163918.45,180128.6,191925.05,209771.88,221981.09,236855.17,255176.67,266797.5,276813.18,284212.9,279521.42,283612.94,282749.41,280804.37],"delinqNotes":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,4,1,0,1,2,2,6,3,2,3,3,7,9,5,6,9,9,11],"delinqPct":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,0.02631578947368421,0.02,0.015625,0.05063291139240506,0.010869565217391304,null,0.008403361344537815,0.015267175572519083,0.014285714285714285,0.04,0.018518518518518517,0.011428571428571429,0.015789473684210527,0.015,0.03317535545023697,0.04128440366972477,0.02262443438914027,0.027649769585253458,0.04054054054054054,0.04072398190045249,0.05],"delinqBalance":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,91669.54,91669.54,91669.54,916917.3,91663.51,0,201956.98,522833.68,166392.84,2470129.01,257172.1,167556.26,333325.04,203414.23,667839.76,943836.72,645883.81,736666.26,1491009.85,1923606.63,2401919.99],"lotsSold":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"ownerFinanced":[4,0,2,0,2,5,0,0,1,8,9,9,4,7,15,14,15,17,19,24,21,16,11,15,15,25,16,12,16,15,8,4,7,3,3],"ownerFinancePct":[4,0,2,0,2,5,0,0,1,8,9,9,4,7,15,14,15,17,19,24,21,16,11,15,15,25,16,12,16,15,8,4,7,3,3],"cashSales":[3,null,2,null,2,0,null,null,0,6,7,7,1,7,15,14,14,16,16,23,15,15,11,13,15,17,16,11,14,10,7,1,7,3,2],"netEquity":[238790.42999999993,238736.70999999996,307169.82000000007,306557.61,313841.60000000003,324052.87,323494.29,323056.88,322074.34,572460.7399999999,851614.5699999998,1083651,1516119.2599999998,1736469.43,3346688.9699999997,4177569.71,4975354.1,5833834.33,8093256.119999999,8809344.870000001,9092873.48,9457910.68,9827903.579999998,10050269.3,10823578.339999998,11245108.27,11768286.29,12676806.8,13265500.56,13925565.110000001,14254298.879999999,14032272.190000001,14202427.969999999,14170904.84,14040945.97],"avgPmtPerNote":[1379.25,1379.25,1307.55,1307.55,1155.5233333333333,1155.5233333333333,1155.5233333333333,1155.5233333333333,1155.5233333333333,1491.87625,1546.2325,1377.0523529411764,1304.0894117647058,1181.21625,1252.5026315789473,1227.39,1216.78625,1222.3282278481013,1318.83,1318.6533333333334,1292.4848739495799,1251.2858778625955,1286.6328571428571,1279.5003333333332,1294.8881481481483,1268.4633714285715,1246.606157894737,1275.88335,1264.4431279620853,1269.7852293577982,1286.031221719457,1288.1171428571429,1277.5357657657657,1279.4090950226243,1276.3835]};
+
+// Tab switching
+window.switchTab = function(tab) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelector('[onclick="window.switchTab(' + Q + tab + Q + ')"]').classList.add('active');
+};
+
+// Chart defaults
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#2a2e3a';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+var charts = {};
+var rangeStart = 0;
+
+function fmtD(v) { return v !== null && v !== undefined ? '$' + v.toLocaleString('en-US', {maximumFractionDigits: 0}) : '-'; }
+function fmtP(v) { return v !== null && v !== undefined ? v.toFixed(2) + '%' : '-'; }
+function fmtN(v) { return v !== null && v !== undefined ? v.toLocaleString('en-US') : '-'; }
+
+function sliceData(arr) { return arr.slice(rangeStart); }
+
+function delta(arr, formatter) {
+  var vals = arr.filter(function(v) { return v !== null; });
+  if (vals.length < 2) return '';
+  var curr = vals[vals.length - 1];
+  var prev = vals[vals.length - 2];
+  var diff = curr - prev;
+  var pct = prev !== 0 ? (diff / Math.abs(prev) * 100).toFixed(1) : 0;
+  var cls = diff >= 0 ? 'up' : 'down';
+  var arrow = diff >= 0 ? '\u25B2' : '\u25BC';
+  return '<span class="' + cls + '">' + arrow + ' ' + formatter(Math.abs(diff)) + ' (' + Math.abs(pct) + '%)</span> MoM';
+}
+
+function updateKPIs() {
+  var d = CD;
+  var last = function(arr) { var f = arr.filter(function(v){ return v !== null; }); return f.length ? f[f.length - 1] : null; };
+  document.getElementById('kpi-notes').textContent = fmtN(last(d.notesHeld));
+  document.getElementById('kpi-notes-d').innerHTML = delta(d.notesHeld, fmtN);
+  document.getElementById('kpi-bal').textContent = fmtD(last(d.noteBalance));
+  document.getElementById('kpi-bal-d').innerHTML = delta(d.noteBalance, fmtD);
+  document.getElementById('kpi-coll').textContent = fmtD(last(d.monthlyPayments));
+  document.getElementById('kpi-coll-d').innerHTML = delta(d.monthlyPayments, fmtD);
+  document.getElementById('kpi-delinq').textContent = fmtP(last(d.delinqPct));
+  document.getElementById('kpi-delinq-d').innerHTML = delta(d.delinqPct, fmtP);
+  document.getElementById('kpi-gp').textContent = fmtP(last(d.gpPct));
+  document.getElementById('kpi-gp-d').innerHTML = delta(d.gpPct, fmtP);
+  document.getElementById('kpi-lots').textContent = fmtN(last(d.lotsSold));
+  document.getElementById('kpi-lots-d').innerHTML = delta(d.lotsSold, fmtN);
+}
+
+function buildCharts() {
+  var labels = sliceData(CD.labels);
+  var opts = function(fmt, stacked) {
+    return {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: true, labels: { boxWidth: 12, padding: 12 } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { ticks: { callback: function(v) { return fmt === '$' ? '$' + (v >= 1000000 ? (v/1000000).toFixed(1) + 'MM' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v) : fmt === '%' ? v.toFixed(1) + '%' : v; } }, stacked: !!stacked },
+        ...(stacked ? { x: { stacked: true, grid: { display: false } } } : {})
+      }
+    };
+  };
+
+  // Destroy existing charts
+  Object.keys(charts).forEach(function(k) { charts[k].destroy(); });
+  charts = {};
+
+  // Portfolio Balance
+  charts.portfolio = new Chart(document.getElementById('chart-portfolio'), {
+    type: 'line', data: {
+      labels: labels,
+      datasets: [
+        { label: 'Note Balance', data: sliceData(CD.noteBalance), borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.1)', fill: true, tension: 0.3 },
+        { label: 'Deferred Revenue', data: sliceData(CD.deferredRev), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3 },
+        { label: 'Basis in Notes', data: sliceData(CD.basisInNotes), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.3 }
+      ]
+    }, options: opts('$')
+  });
+
+  // Notes Count
+  charts.notes = new Chart(document.getElementById('chart-notes'), {
+    type: 'bar', data: {
+      labels: labels,
+      datasets: [{ label: 'Notes Held', data: sliceData(CD.notesHeld), backgroundColor: '#60a5fa', borderRadius: 3 }]
+    }, options: { ...opts('#'), plugins: { legend: { display: false } } }
+  });
+
+  // Net Equity
+  charts.equity = new Chart(document.getElementById('chart-equity'), {
+    type: 'line', data: {
+      labels: labels,
+      datasets: [{ label: 'Net Equity', data: sliceData(CD.netEquity), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', fill: true, tension: 0.3 }]
+    }, options: { ...opts('$'), plugins: { legend: { display: false } } }
+  });
+
+  // Monthly Payments
+  charts.payments = new Chart(document.getElementById('chart-payments'), {
+    type: 'bar', data: {
+      labels: labels,
+      datasets: [{ label: 'Monthly Payments', data: sliceData(CD.monthlyPayments), backgroundColor: '#a855f7', borderRadius: 3 }]
+    }, options: { ...opts('$'), plugins: { legend: { display: false } } }
+  });
+
+  // Avg Payment per Note
+  charts.avgpmt = new Chart(document.getElementById('chart-avgpmt'), {
+    type: 'line', data: {
+      labels: labels,
+      datasets: [{ label: 'Avg Payment/Note', data: sliceData(CD.avgPmtPerNote), borderColor: '#ec4899', backgroundColor: 'rgba(236,72,153,0.15)', fill: true, tension: 0.3 }]
+    }, options: { ...opts('$'), plugins: { legend: { display: false } } }
+  });
+
+  // Delinquency Rate
+  charts.delinqrate = new Chart(document.getElementById('chart-delinqrate'), {
+    type: 'line', data: {
+      labels: labels,
+      datasets: [{ label: 'Delinquency %', data: sliceData(CD.delinqPct), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', fill: true, tension: 0.3 }]
+    }, options: { ...opts('%'), plugins: { legend: { display: false } } }
+  });
+
+  // Delinquency Balance + Count
+  charts.delinqbal = new Chart(document.getElementById('chart-delinqbal'), {
+    type: 'bar', data: {
+      labels: labels,
+      datasets: [
+        { label: 'Delinq Balance', data: sliceData(CD.delinqBalance), backgroundColor: '#ef4444', borderRadius: 3, yAxisID: 'y' },
+        { label: 'Delinq Count', data: sliceData(CD.delinqNotes), type: 'line', borderColor: '#f59e0b', backgroundColor: 'transparent', yAxisID: 'y1', tension: 0.3, pointRadius: 3 }
+      ]
+    }, options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { boxWidth: 12, padding: 12 } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { position: 'left', ticks: { callback: function(v) { return '$' + (v >= 1000000 ? (v/1000000).toFixed(1) + 'MM' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v); } } },
+        y1: { position: 'right', grid: { display: false }, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+
+  // Lot Sales
+  charts.sales = new Chart(document.getElementById('chart-sales'), {
+    type: 'bar', data: {
+      labels: labels,
+      datasets: [
+        { label: 'Owner Financed', data: sliceData(CD.ownerFinanced), backgroundColor: '#22c55e', borderRadius: 3 },
+        { label: 'Cash Sales', data: sliceData(CD.cashSales), backgroundColor: '#06b6d4', borderRadius: 3 }
+      ]
+    }, options: opts('#', true)
+  });
+
+  // GP%
+  charts.gp = new Chart(document.getElementById('chart-gp'), {
+    type: 'line', data: {
+      labels: labels,
+      datasets: [{ label: 'GP %', data: sliceData(CD.gpPct), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', fill: true, tension: 0.3 }]
+    }, options: { ...opts('%'), plugins: { legend: { display: false } } }
+  });
+
+  // Financial charts (always show full data)
+  // Asset Breakdown Doughnut
+  charts.assets = new Chart(document.getElementById('chart-assets'), {
+    type: 'doughnut', data: {
+      labels: ['Notes Receivable', 'Investment in SLR', 'Land Inventory', 'Cash', 'Fixed Assets', 'Other'],
+      datasets: [{ data: [28453018, 5104611, 2838389, 483875, 34130, 152000], backgroundColor: ['#60a5fa','#22c55e','#f59e0b','#ec4899','#a855f7','#06b6d4'] }]
+    }, options: { responsive: true, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } } } }
+  });
+
+  // Income Sources
+  charts.income = new Chart(document.getElementById('chart-income'), {
+    type: 'doughnut', data: {
+      labels: ['Interest Income', 'Installment Sale', 'Management Fees', 'Sales', 'Other Income', 'Loan Orig Fees', 'Fee Income'],
+      datasets: [{ data: [1127995, 778045, 237348, 470650, 41133, 36091, 16473], backgroundColor: ['#60a5fa','#22c55e','#f59e0b','#ec4899','#a855f7','#06b6d4','#f97316'] }]
+    }, options: { responsive: true, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } } } }
+  });
+
+  // Expense Breakdown
+  charts.expenses = new Chart(document.getElementById('chart-expenses'), {
+    type: 'bar', data: {
+      labels: ['Interest', 'Salaries', 'Mgmt Fee', 'Loan Svc', 'Professional', 'Advertising', 'Payroll Tax', 'Prop Tax', 'Other'],
+      datasets: [{ data: [499276, 263447, 109015, 59946, 53437, 39344, 19506, 21612, 45371], backgroundColor: '#60a5fa', borderRadius: 3 }]
+    }, options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: function(v) { return '$' + (v/1000).toFixed(0) + 'K'; } } }, y: { grid: { display: false } } }
+    }
+  });
+
+  // Leverage
+  charts.leverage = new Chart(document.getElementById('chart-leverage'), {
+    type: 'doughnut', data: {
+      labels: ['Notes Payable (Vista Bank)', 'Deferred Revenue', "Partners' Capital"],
+      datasets: [{ data: [14434105, 14412072, 8219846], backgroundColor: ['#ef4444','#f59e0b','#22c55e'] }]
+    }, options: { responsive: true, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } } } }
+  });
+
+  // Partner balance bar
+  var partnerNames = ["BLC Preston","KCH Hart","Kulbeth","Pigg Brothers","WCA","LBGI"];
+  var partnerBals = [1369975,1369974,1369974,1369974,1369974,1369975];
+  charts.partnerBal = new Chart(document.getElementById('chart-partner-bal'), {
+    type: 'bar', data: {
+      labels: partnerNames,
+      datasets: [{ data: partnerBals, backgroundColor: ['#60a5fa','#22c55e','#f59e0b','#ec4899','#a855f7','#06b6d4'], borderRadius: 3 }]
+    }, options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: function(v) { return '$' + (v/1000000).toFixed(2) + 'MM'; } } }, x: { grid: { display: false } } }
+    }
+  });
+
+  // Partner waterfall
+  charts.partnerWaterfall = new Chart(document.getElementById('chart-partner-waterfall'), {
+    type: 'bar', data: {
+      labels: ['Beg Balance (12/31/24)', 'Contributions', 'Net Income (Jan-Apr)', 'Net Income (May)', 'End Balance (5/31/25)'],
+      datasets: [{
+        data: [5876103, 1007615, 1036990, 299138, 8219846],
+        backgroundColor: ['#64748b','#22c55e','#60a5fa','#60a5fa','#a855f7'], borderRadius: 3
+      }]
+    }, options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: function(v) { return '$' + (v/1000000).toFixed(1) + 'MM'; } } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+window.setRange = function(r) {
+  document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (r === 'all') {
+    rangeStart = 0;
+    document.querySelector('[onclick="window.setRange(' + Q + 'all' + Q + ')"]').classList.add('active');
+  } else {
+    rangeStart = Math.max(0, CD.labels.length - r);
+    document.querySelector('[onclick="window.setRange(' + r + ')"]').classList.add('active');
+  }
+  buildCharts();
+};
+
+updateKPIs();
+buildCharts();
+</script>
+</body>
+</html>
