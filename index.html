@@ -409,8 +409,8 @@ function buildCharts() {
   charts.payments = new Chart(document.getElementById('chart-payments'), {
     type: 'bar', data: {
       labels: labels,
-      datasets: [{ label: 'Monthly Payments', data: sliceData(CD.monthlyPayments), backgroundColor: '#a855f7', borderRadius: 3 }]
-    }, options: { ...opts('$'), plugins: { legend: { display: false } } }
+      datasets: [{ label: 'Monthly Payments', data: sliceData(CD.monthlyPayments), backgroundColor: '#22c55e', borderRadius: 3 }]
+    }, options: { ...opts('$'), plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + ctx.parsed.y.toLocaleString('en-US'); } } } } }
   });
 
   // Avg Payment per Note
